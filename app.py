@@ -5,7 +5,7 @@ import os
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
-            response = {"status": "unhealthy", "version": "1.1"}
+            response = {"status": "healthy", "version": "1.0"}
             self.send_response(200)
         else:
             response = {"message": "Trading Support Lab"}
