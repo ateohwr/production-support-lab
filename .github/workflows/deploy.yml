@@ -1,0 +1,56 @@
+name: Production Support Lab
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check Python syntax
+        run: python -m py_compile app.py
+
+      - name: Start application
+        run: |
+          python app.py > app.log 2>&1 &
+          echo $! > app.pid
+
+      - name: Verify application health
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          for attempt in range(10):
+              try:
+                  with urllib.request.urlopen(
+                      "http://localhost:8000/health",
+                      timeout=2
+                  ) as response:
+                      data = json.load(response)
+                      assert response.status == 200
+                      assert data["status"] == "healthy"
+                      print("Health check passed:", data)
+                      break
+              except Exception:
+                  if attempt == 9:
+                      raise
+                  time.sleep(1)
+          PY
+
+      - name: Show application logs
+        if: always()
+        run: cat app.log || true
