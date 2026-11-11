@@ -92,12 +92,16 @@ jobs:
 
             resource_failure)
               echo "Simulating application resource exhaustion"
-              PORT=8000 python app.py > app.log 2>&1 &
+
+              PORT=8000 python -u app.py > app.log 2>&1 &
               echo $! > app.pid
 
-              # Simulate a resource-related warning safely.
-              echo "WARNING: Simulated resource pressure" \
-                > resource.log
+              sleep 3
+
+              echo "WARNING: Simulated resource pressure" > resource.log
+
+              echo "===== RESOURCE WARNING ====="
+              cat resource.log
               ;;
 
           esac
