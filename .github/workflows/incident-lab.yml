@@ -61,8 +61,14 @@ jobs:
               ;;
             health_failure)
               echo "Simulating application health failure"
-              HEALTH_STATUS=unhealthy python app.py > app.log 2>&1 &
+
+              HEALTH_STATUS=unhealthy python -u app.py > app.log 2>&1 &
               echo $! > app.pid
+
+              sleep 3
+
+              echo "===== APPLICATION STARTUP LOGS ====="
+              cat app.log
               ;;
 
             network_failure)
