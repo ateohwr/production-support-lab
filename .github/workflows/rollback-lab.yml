@@ -1,0 +1,86 @@
+name: Production Rollback Lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Application version to deploy"
+        required: true
+        type: choice
+        options:
+          - "1.0.0"
+          - "1.1.0"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare release
+        run: |
+          mkdir -p deployment
+          cp app.py deployment/
+          echo "${{ inputs.version }}" > deployment/VERSION
+
+      - name: Deploy application
+        run: |
+          cd deployment
+
+          export APP_VERSION=$(cat VERSION)
+
+          if [ "$APP_VERSION" = "1.1.0" ]; then
+            export HEALTH_STATUS="unhealthy"
+          else
+            export HEALTH_STATUS="healthy"
+          fi
+
+          echo "Deploying application version $APP_VERSION"
+
+          python app.py > app.log 2>&1 &
+          echo $! > app.pid
+
+      - name: Verify application health
+        run: |
+          cd deployment
+
+          python - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+
+          for attempt in range(10):
+              try:
+                  with urllib.request.urlopen(
+                      "http://127.0.0.1:8000/health",
+                      timeout=2
+                  ) as response:
+                      data = json.load(response)
+
+                      assert response.status == 200
+                      assert data["status"] == "healthy"
+
+                      print("Health check passed:", data)
+                      break
+
+              except Exception as error:
+                  print("Health check failed:", error)
+
+                  if attempt == 9:
+                      raise
+
+                  time.sleep(1)
+          PY
+
+      - name: Show application logs
+        if: always()
+        run: |
+          cat deployment/app.log || true
