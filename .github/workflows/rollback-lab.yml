@@ -80,7 +80,25 @@ jobs:
                   time.sleep(1)
           PY
 
-      - name: Show application logs
+      - name: Production diagnostics
         if: always()
         run: |
+          echo "===== APPLICATION LOGS ====="
           cat deployment/app.log || true
+
+          echo "===== RUNNING PROCESSES ====="
+          ps aux | grep '[p]ython' || true
+
+          echo "===== LISTENING PORTS ====="
+          ss -tulnp || true
+
+          echo "===== CPU AND MEMORY ====="
+          free -m
+          uptime
+
+          echo "===== DISK SPACE ====="
+          df -h
+
+          echo "===== APPLICATION HEALTH ====="
+          curl -i --max-time 5 \
+            http://127.0.0.1:8000/health || true
