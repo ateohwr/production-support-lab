@@ -103,3 +103,41 @@ jobs:
           test -f deployments/prod/app.py
           test -f deployments/prod/VERSION
           echo "PRODUCTION deployment verified"
+
+      - name: Verify application health
+        run: |
+          cd deployments/prod
+
+          export APP_VERSION=$(cat VERSION)
+
+          python app.py > app.log 2>&1 &
+          APP_PID=$!
+
+          trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
+
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          for attempt in range(10):
+              try:
+                  with urllib.request.urlopen(
+                      "http://127.0.0.1:8000/health",
+                      timeout=2
+                  ) as response:
+                      data = json.load(response)
+
+                      assert response.status == 200
+                      assert data["status"] == "healthy"
+                      assert data["version"] == "1.0.0"
+
+                      print("Production health check passed:", data)
+                      break
+
+              except Exception:
+                  if attempt == 9:
+                      raise
+                  time.sleep(1)
+          PY
+          
