@@ -50,10 +50,15 @@ jobs:
 
             startup_failure)
               echo "Simulating application startup failure"
-              PORT=invalid python app.py > app.log 2>&1 &
-              echo $! > app.pid
-              ;;
 
+              PORT=invalid python -u app.py > app.log 2>&1 &
+              echo $! > app.pid
+
+              sleep 3
+
+              echo "===== STARTUP ERROR ====="
+              cat app.log
+              ;;
             health_failure)
               echo "Simulating application health failure"
               HEALTH_STATUS=unhealthy python app.py > app.log 2>&1 &
