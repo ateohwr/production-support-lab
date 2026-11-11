@@ -156,6 +156,33 @@ jobs:
 
           fi
 
+      - name: Recover application
+        if: failure()
+        run: |
+          echo "Starting simulated recovery"
+
+          cd incident
+
+          if [ -f app.pid ]; then
+            kill "$(cat app.pid)" 2>/dev/null || true
+          fi
+
+          export PORT=8000
+          export HEALTH_STATUS=healthy
+          export APP_VERSION=1.0.0
+
+          python app.py > recovery.log 2>&1 &
+          echo $! > recovery.pid
+
+          sleep 2
+
+          echo "Verifying recovered application"
+
+          curl -fsS --max-time 5 \
+            http://127.0.0.1:8000/health
+
+          echo "Recovery verification successful"
+          
       - name: Collect incident evidence
         if: always()
         uses: actions/upload-artifact@v4
