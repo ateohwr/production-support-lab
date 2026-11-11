@@ -2,13 +2,21 @@ import http.server
 import json
 import os
 
+VERSION = os.environ.get("APP_VERSION", "1.0")
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
-            response = {"status": "healthy", "version": "1.0"}
+            response = {
+                "status": "healthy",
+                "version": VERSION
+            }
             self.send_response(200)
         else:
-            response = {"message": "Trading Support Lab"}
+            response = {
+                "message": "Trading Support Lab",
+                "version": VERSION
+            }
             self.send_response(200)
 
         self.send_header("Content-Type", "application/json")
@@ -17,6 +25,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
-    server = http.server.HTTPServer(("0.0.0.0", port), Handler)
-    print(f"Application running on port {port}", flush=True)
+    server = http.server.HTTPServer(("127.0.0.1", port), Handler)
+    print(f"Application version {VERSION} running on port {port}", flush=True)
     server.serve_forever()
