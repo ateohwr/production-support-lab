@@ -80,8 +80,14 @@ jobs:
 
             configuration_failure)
               echo "Simulating incorrect application configuration"
-              PORT=invalid python app.py > app.log 2>&1 &
+
+              PORT=invalid python -u app.py > app.log 2>&1 &
               echo $! > app.pid
+
+              sleep 3
+
+              echo "===== CONFIGURATION ERROR ====="
+              cat app.log
               ;;
 
             resource_failure)
