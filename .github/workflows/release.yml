@@ -1,0 +1,105 @@
+name: Application Release Pipeline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    name: Build Release Artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate application
+        run: python -m py_compile app.py
+
+      - name: Package application
+        run: |
+          mkdir -p package
+          cp app.py package/
+          echo "1.0.0" > package/VERSION
+          tar -czf application.tar.gz -C package .
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-release
+          path: application.tar.gz
+
+  deploy-dev:
+    name: Deploy to DEV
+    needs: build
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: application-release
+
+      - name: Deploy application
+        run: |
+          mkdir -p deployments/dev
+          tar -xzf application.tar.gz -C deployments/dev
+          echo "Application deployed to DEV"
+
+      - name: Verify deployment
+        run: |
+          test -f deployments/dev/app.py
+          test -f deployments/dev/VERSION
+          echo "DEV deployment verified"
+
+  deploy-uat:
+    name: Deploy to UAT
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: uat
+
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: application-release
+
+      - name: Deploy application
+        run: |
+          mkdir -p deployments/uat
+          tar -xzf application.tar.gz -C deployments/uat
+          echo "Application deployed to UAT"
+
+      - name: Verify deployment
+        run: |
+          test -f deployments/uat/app.py
+          test -f deployments/uat/VERSION
+          echo "UAT deployment verified"
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: deploy-uat
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: application-release
+
+      - name: Deploy application
+        run: |
+          mkdir -p deployments/prod
+          tar -xzf application.tar.gz -C deployments/prod
+          echo "Application deployed to PRODUCTION"
+
+      - name: Verify deployment
+        run: |
+          test -f deployments/prod/app.py
+          test -f deployments/prod/VERSION
+          echo "PRODUCTION deployment verified"
