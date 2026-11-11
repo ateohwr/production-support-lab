@@ -1,0 +1,146 @@
+name: Production Incident Simulation Lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      incident:
+        description: "Select production incident"
+        required: true
+        type: choice
+        options:
+          - startup_failure
+          - health_failure
+          - network_failure
+          - configuration_failure
+          - resource_failure
+
+permissions:
+  contents: read
+
+jobs:
+  incident-simulation:
+    name: Investigate Production Incident
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prepare incident environment
+        run: |
+          mkdir -p incident
+          cp app.py incident/
+
+          echo "Incident selected: ${{ inputs.incident }}"
+
+      - name: Simulate incident
+        env:
+          INCIDENT: ${{ inputs.incident }}
+        run: |
+          cd incident
+
+          case "$INCIDENT" in
+
+            startup_failure)
+              echo "Simulating application startup failure"
+              PORT=invalid python app.py > app.log 2>&1 &
+              echo $! > app.pid
+              ;;
+
+            health_failure)
+              echo "Simulating application health failure"
+              HEALTH_STATUS=unhealthy python app.py > app.log 2>&1 &
+              echo $! > app.pid
+              ;;
+
+            network_failure)
+              echo "Simulating network connectivity failure"
+              PORT=8000 python app.py > app.log 2>&1 &
+              echo $! > app.pid
+              echo "CHECK_PORT=9999" >> "$GITHUB_ENV"
+              ;;
+
+            configuration_failure)
+              echo "Simulating incorrect application configuration"
+              PORT=invalid python app.py > app.log 2>&1 &
+              echo $! > app.pid
+              ;;
+
+            resource_failure)
+              echo "Simulating application resource exhaustion"
+              PORT=8000 python app.py > app.log 2>&1 &
+              echo $! > app.pid
+
+              # Simulate a resource-related warning safely.
+              echo "WARNING: Simulated resource pressure" \
+                > resource.log
+              ;;
+
+          esac
+
+      - name: Investigate application
+        env:
+          INCIDENT: ${{ inputs.incident }}
+        run: |
+          cd incident
+
+          echo "===== APPLICATION LOGS ====="
+          cat app.log || true
+
+          echo "===== PROCESS STATUS ====="
+          ps aux | grep '[p]ython' || true
+
+          echo "===== NETWORK PORTS ====="
+          ss -tulnp || true
+
+          echo "===== MEMORY ====="
+          free -m
+
+          echo "===== DISK ====="
+          df -h
+
+          echo "===== HEALTH CHECK ====="
+
+          PORT_TO_CHECK="${CHECK_PORT:-8000}"
+
+          curl -i --max-time 5 \
+            "http://127.0.0.1:$PORT_TO_CHECK/health" || true
+
+      - name: Evaluate incident
+        env:
+          INCIDENT: ${{ inputs.incident }}
+        run: |
+          cd incident
+
+          PORT_TO_CHECK="${CHECK_PORT:-8000}"
+
+          echo "Evaluating incident: $INCIDENT"
+
+          if curl -fsS --max-time 5 \
+            "http://127.0.0.1:$PORT_TO_CHECK/health"; then
+
+            echo "Application health check passed"
+
+          else
+
+            echo "INCIDENT DETECTED: Application unavailable or unhealthy"
+            exit 1
+
+          fi
+
+      - name: Collect incident evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: incident-evidence-${{ github.run_id }}
+          path: |
+            incident/app.log
+            incident/resource.log
+          if-no-files-found: warn
